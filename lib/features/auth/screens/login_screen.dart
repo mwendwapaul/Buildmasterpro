@@ -187,8 +187,8 @@ class LoginScreenState extends State<LoginScreen> {
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              theme.colorScheme.primary.withOpacity(0.8),
-              theme.colorScheme.secondary.withOpacity(0.8),
+              theme.colorScheme.primary.withValues(alpha:0.8),
+              theme.colorScheme.secondary.withValues(alpha:0.8),
             ],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -265,7 +265,7 @@ class LoginScreenState extends State<LoginScreen> {
               'Manage your construction projects\nwith confidence',
               textAlign: TextAlign.center,
               style: theme.textTheme.titleMedium?.copyWith(
-                color: theme.colorScheme.onPrimary.withOpacity(0.8),
+                color: theme.colorScheme.onPrimary.withValues(alpha:0.8),
               ),
             ),
           ],
@@ -309,7 +309,7 @@ class LoginScreenState extends State<LoginScreen> {
                 Text(
                   'Sign in to continue managing your projects',
                   style: theme.textTheme.bodyLarge?.copyWith(
-                    color: theme.colorScheme.onSurface.withOpacity(0.7),
+                    color: theme.colorScheme.onSurface.withValues(alpha:0.7),
                   ),
                   textAlign: TextAlign.center,
                 ),

@@ -1,163 +1,106 @@
 import 'package:flutter/material.dart';
-import 'biometric_clock_in_out_screen.dart';
-import 'geofencing_screen.dart';
-import 'detailed_timesheets_screen.dart';
-import 'overtime_tracking_screen.dart';
-
-void main() {
-  runApp(const MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Time Tracking App',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      home: const TimeTrackingScreen(),
-    );
-  }
-}
 
 class TimeTrackingScreen extends StatelessWidget {
   const TimeTrackingScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Time Tracking'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.pop(context),
+          tooltip: 'Back to Home',
+        ),
+        title: const Text('Track Your Time'),
         centerTitle: true,
-        backgroundColor: Colors.blueAccent,
+        elevation: 2,
       ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Track Your Time Efficiently',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Quick Actions',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: GridView.count(
+                crossAxisCount: 2,
+                mainAxisSpacing: 16,
+                crossAxisSpacing: 16,
+                childAspectRatio: 1.2,
+                children: [
+                  _QuickActionButton(
+                    icon: Icons.fingerprint,
+                    label: 'Biometric\nClock',
+                    color: Theme.of(context).colorScheme.primary,
+                    onTap: () => Navigator.pushNamed(context, '/biometric_clock_in_out'),
+                  ),
+                  _QuickActionButton(
+                    icon: Icons.location_on,
+                    label: 'Geofencing',
+                    color: Theme.of(context).colorScheme.secondary,
+                    onTap: () => Navigator.pushNamed(context, '/geofencing'),
+                  ),
+                  _QuickActionButton(
+                    icon: Icons.timer,
+                    label: 'Overtime\nTracking',
+                    color: Theme.of(context).colorScheme.tertiary,
+                    onTap: () => Navigator.pushNamed(context, '/overtime_tracking'),
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              Expanded(
-                child: GridView.count(
-                  crossAxisCount: 2,
-                  childAspectRatio: 1.3,
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                  shrinkWrap: true,
-                  physics: const BouncingScrollPhysics(),
-                  children: [
-                    _buildTimeTrackingCard(
-                      context,
-                      'Biometric Clock-In/Out',
-                      Icons.access_alarm,
-                      Colors.blue,
-                      () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              const BiometricClockInOutScreen(),
-                        ),
-                      ),
-                    ),
-                    _buildTimeTrackingCard(
-                      context,
-                      'Geofencing',
-                      Icons.location_on,
-                      Colors.green,
-                      () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const GeofencingScreen(),
-                        ),
-                      ),
-                    ),
-                    _buildTimeTrackingCard(
-                      context,
-                      'Detailed Timesheets',
-                      Icons.calendar_today,
-                      Colors.orange,
-                      () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              const DetailedTimesheetsScreen(),
-                        ),
-                      ),
-                    ),
-                    _buildTimeTrackingCard(
-                      context,
-                      'Overtime Tracking',
-                      Icons.access_time,
-                      Colors.red,
-                      () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const OvertimeTrackingScreen(),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
+}
 
-  Widget _buildTimeTrackingCard(
-    BuildContext context,
-    String title,
-    IconData icon,
-    Color color,
-    VoidCallback onTap,
-  ) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Card(
-        elevation: 4,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Container(
-          padding: const EdgeInsets.all(12), // Reduced padding
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                size: 36, // Slightly reduced icon size
+class _QuickActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _QuickActionButton({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 4,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        onTap: onTap,
+        splashColor: color.withValues(alpha:0.2),
+        highlightColor: color.withValues(alpha:0.1),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 40, color: color),
+            const SizedBox(height: 12),
+            Text(
+              label,
+              style: TextStyle(
                 color: color,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
               ),
-              const SizedBox(height: 8), // Reduced spacing
-              Text(
-                title,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16, // Slightly reduced font size
-                  color: color,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       ),
     );

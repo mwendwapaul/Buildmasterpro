@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
-import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import 'dart:io';
 import 'package:open_file/open_file.dart';
-import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 
 class DocumentManagementScreen extends StatefulWidget {
   const DocumentManagementScreen({super.key});
@@ -17,25 +15,47 @@ class DocumentManagementScreen extends StatefulWidget {
 }
 
 class _DocumentManagementScreenState extends State<DocumentManagementScreen> {
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _descriptionController = TextEditingController();
   bool _isUploading = false;
-  String? _selectedCategory;
-  String? _selectedFilterCategory;
   double _uploadProgress = 0.0;
+  String _searchQuery = '';
+  final Map<String, List<File>> _documents = {
+    'Images': [],
+    'Documents': [],
+    'PDFs': [],
+    'Other': [],
+  };
 
   final List<Map<String, dynamic>> _categories = [
-    {'name': 'Images', 'icon': Icons.image, 'extensions': ['.jpg', '.jpeg', '.png', '.gif']},
-    {'name': 'Documents', 'icon': Icons.description, 'extensions': ['.doc', '.docx', '.txt']},
-    {'name': 'PDFs', 'icon': Icons.picture_as_pdf, 'extensions': ['.pdf']},
-    {'name': 'Other', 'icon': Icons.attachment, 'extensions': []}
+    {
+      'name': 'Images',
+      'icon': Icons.image,
+      'color': Colors.blue,
+      'extensions': ['.jpg', '.jpeg', '.png', '.gif']
+    },
+    {
+      'name': 'Documents',
+      'icon': Icons.description,
+      'color': Colors.green,
+      'extensions': ['.doc', '.docx', '.txt']
+    },
+    {
+      'name': 'PDFs',
+      'icon': Icons.picture_as_pdf,
+      'color': Colors.red,
+      'extensions': ['.pdf']
+    },
+    {
+      'name': 'Other',
+      'icon': Icons.attachment,
+      'color': Colors.grey,
+      'extensions': []
+    },
   ];
 
   @override
-  void dispose() {
-    _nameController.dispose();
-    _descriptionController.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _loadLocalFiles();
   }
 
   String _getFileType(String fileName) {
@@ -48,43 +68,25 @@ class _DocumentManagementScreenState extends State<DocumentManagementScreen> {
     return 'Other';
   }
 
-  void _showMessage(String message, {bool isError = false}) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? Colors.red : Colors.green,
-        duration: const Duration(seconds: 3),
-      ),
-    );
-  }
+  Future<void> _loadLocalFiles() async {
+    try {
+      final appDir = await getApplicationDocumentsDirectory();
+      final files = Directory(appDir.path).listSync();
 
-  void _resetUploadState() {
-    _nameController.clear();
-    _descriptionController.clear();
-    _selectedCategory = null;
-    _uploadProgress = 0.0;
-  }
+      setState(() {
+        for (final category in _documents.keys) {
+          _documents[category] = [];
+        }
 
-  String _getContentType(String extension) {
-    switch (extension.toLowerCase()) {
-      case '.pdf':
-        return 'application/pdf';
-      case '.doc':
-        return 'application/msword';
-      case '.docx':
-        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-      case '.txt':
-        return 'text/plain';
-      case '.jpg':
-      case '.jpeg':
-        return 'image/jpeg';
-      case '.png':
-        return 'image/png';
-      case '.gif':
-        return 'image/gif';
-      default:
-        return 'application/octet-stream';
+        for (final file in files) {
+          if (file is File) {
+            final category = _getFileType(file.path);
+            _documents[category]?.add(file);
+          }
+        }
+      });
+    } catch (e) {
+      _showMessage('Error loading files: $e', isError: true);
     }
   }
 
@@ -103,7 +105,6 @@ class _DocumentManagementScreenState extends State<DocumentManagementScreen> {
       final result = await FilePicker.platform.pickFiles(
         allowMultiple: true,
         withData: true,
-        onFileLoading: (FilePickerStatus status) => debugPrint(status.toString()),
       );
 
       if (result == null || result.files.isEmpty) {
@@ -111,335 +112,359 @@ class _DocumentManagementScreenState extends State<DocumentManagementScreen> {
         return;
       }
 
+      final appDir = await getApplicationDocumentsDirectory();
+      final totalFiles = result.files.length;
+      int processedFiles = 0;
+
       for (final file in result.files) {
         if (file.bytes == null) {
           _showMessage('Error: Unable to read ${file.name}', isError: true);
           continue;
         }
 
-        _resetUploadState();
-        _nameController.text = file.name;
-        _selectedCategory = _getFileType(file.name);
+        final fileName = file.name;
+        final localPath = path.join(appDir.path, fileName);
 
-        final shouldUpload = await _showFileDetailsDialog();
-        if (!shouldUpload) continue;
+        final localFile = File(localPath);
+        await localFile.writeAsBytes(file.bytes!);
 
-        final fileName = _nameController.text.trim();
-        if (fileName.isEmpty) {
-          _showMessage('File name cannot be empty', isError: true);
-          continue;
-        }
+        final category = _getFileType(fileName);
+        setState(() {
+          _documents[category]?.add(localFile);
+          processedFiles++;
+          _uploadProgress = processedFiles / totalFiles;
+        });
 
-        final description = _descriptionController.text.trim();
-        final category = _selectedCategory ?? _getFileType(file.name);
-        final fileBytes = file.bytes!;
-        final fileExtension = path.extension(fileName).toLowerCase();
-        
-        // Ensure the current user is authenticated
-        final user = FirebaseAuth.instance.currentUser;
-        if (user == null) {
-          _showMessage('User not authenticated', isError: true);
-          continue;
-        }
-
-        // Create a unique filename to prevent overwrites
-        final uniqueFileName = '${user.uid}_${DateTime.now().millisecondsSinceEpoch}_$fileName';
-        final storageRef = FirebaseStorage.instance
-            .ref()
-            .child('documents/$uniqueFileName');
-
-        // Set proper content type based on file extension
-        final contentType = _getContentType(fileExtension);
-        final metadata = SettableMetadata(
-          contentType: contentType,
-          customMetadata: {
-            'originalName': fileName,
-            'category': category,
-            'description': description,
-            'uploadedBy': user.uid,
-          },
-        );
-
-        try {
-          // Upload file to Firebase Storage
-          final uploadTask = storageRef.putData(fileBytes, metadata);
-
-          uploadTask.snapshotEvents.listen(
-            (TaskSnapshot snapshot) {
-              setState(() {
-                _uploadProgress = snapshot.bytesTransferred / snapshot.totalBytes;
-              });
-            },
-            onError: (error) {
-              _showMessage('Storage upload error: $error', isError: true);
-              debugPrint('Storage upload error: $error');
-            },
-          );
-
-          // Wait for upload to complete
-          final snapshot = await uploadTask;
-          
-          // Get download URL
-          final downloadUrl = await snapshot.ref.getDownloadURL();
-
-          // Add document metadata to Firestore
-          await FirebaseFirestore.instance.collection('documents').add({
-            'name': fileName,
-            'description': description,
-            'category': category,
-            'url': downloadUrl,
-            'uploadedBy': user.uid,
-            'timestamp': FieldValue.serverTimestamp(),
-            'fileType': fileExtension,
-            'size': fileBytes.length,
-            'storagePath': storageRef.fullPath,
-          });
-
-          _showMessage('${file.name} uploaded successfully');
-        } catch (e) {
-          _showMessage('Upload process error: $e', isError: true);
-          debugPrint('Upload process error: $e');
-          
-          // Attempt to delete the storage reference if something went wrong
-          try {
-            await storageRef.delete();
-          } catch (deleteError) {
-            debugPrint('Error cleaning up storage file: $deleteError');
-          }
-        }
+        _showMessage('${file.name} uploaded successfully');
       }
     } catch (e) {
       _showMessage('Unexpected error during upload: $e', isError: true);
-      debugPrint('Unexpected error: $e');
     } finally {
       setState(() {
         _isUploading = false;
         _uploadProgress = 0.0;
       });
+      await _loadLocalFiles();
     }
   }
 
-  Future<bool> _showFileDetailsDialog() async {
-    return await showDialog<bool>(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => AlertDialog(
-            title: const Text('File Details'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: _nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'File Name',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _descriptionController,
-                    decoration: const InputDecoration(
-                      labelText: 'Description',
-                      border: OutlineInputBorder(),
-                    ),
-                    maxLines: 3,
-                  ),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<String>(
-                    value: _selectedCategory,
-                    decoration: const InputDecoration(
-                      labelText: 'Category',
-                      border: OutlineInputBorder(),
-                    ),
-                    items: _categories.map((category) {
-                      return DropdownMenuItem<String>(
-                        value: category['name'] as String,
-                        child: Row(
-                          children: [
-                            Icon(category['icon'] as IconData),
-                            const SizedBox(width: 8),
-                            Text(category['name'] as String),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (value) => setState(() => _selectedCategory = value),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  if (_nameController.text.trim().isEmpty) {
-                    _showMessage('Please enter a file name', isError: true);
-                    return;
-                  }
-                  Navigator.pop(context, true);
-                },
-                child: const Text('Upload'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
+  void _showMessage(String message, {bool isError = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red : Colors.green,
+        duration: const Duration(seconds: 3),
+      ),
+    );
   }
 
-  Future<void> _deleteDocument(String docId, String url, String storagePath) async {
-    final confirmed = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Confirm Delete'),
-            content: const Text('Are you sure you want to delete this file?'),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('Delete', style: TextStyle(color: Colors.red)),
-              ),
-            ],
-          ),
-        ) ??
-        false;
-
-    if (!confirmed) return;
-
+  Future<void> _openFile(String filePath) async {
     try {
-      // First try to delete from Storage
-      try {
-        final storageRef = FirebaseStorage.instance.ref().child(storagePath);
-        await storageRef.delete();
-      } catch (e) {
-        debugPrint('Error deleting from storage: $e');
-        // Continue with Firestore deletion even if Storage deletion fails
+      final File file = File(filePath);
+      if (!await file.exists()) {
+        _showMessage('File not found: ${path.basename(filePath)}', isError: true);
+        return;
       }
 
-      // Then delete from Firestore
-      await FirebaseFirestore.instance
-          .collection('documents')
-          .doc(docId)
-          .delete();
-      
-      _showMessage('File deleted successfully');
-    } catch (e) {
-      _showMessage('Error deleting file: $e', isError: true);
-    }
-  }
-
-  Future<void> _viewDocument(DocumentSnapshot doc) async {
-    final url = doc['url'] as String;
-    final fileType = doc['fileType'] as String?;
-    final name = doc['name'] as String;
-
-    try {
-      if (fileType != null &&
-          ['.jpg', '.jpeg', '.png', '.gif'].contains(fileType.toLowerCase())) {
-        await showDialog(
-          context: context,
-          builder: (context) => Dialog(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                AppBar(
-                  title: Text(name),
-                  leading: IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ),
-                Flexible(
-                  child: InteractiveViewer(
-                    minScale: 0.5,
-                    maxScale: 4.0,
-                    child: Image.network(
-                      url,
-                      fit: BoxFit.contain,
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return Center(
-                          child: CircularProgressIndicator(
-                            value: loadingProgress.expectedTotalBytes != null
-                                ? loadingProgress.cumulativeBytesLoaded /
-                                    loadingProgress.expectedTotalBytes!
-                                : null,
-                          ),
-                        );
-                      },
-                      errorBuilder: (context, error, stackTrace) {
-                        return const Center(
-                          child: Text('Error loading image'),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      } else {
-        final file = await DefaultCacheManager().getSingleFile(url);
-        final result = await OpenFile.open(file.path);
-        if (result.type != ResultType.done) {
-          throw Exception(result.message);
-        }
+      final result = await OpenFile.open(filePath);
+      if (result.type != ResultType.done) {
+        _showMessage('Could not open ${path.basename(filePath)}: ${result.message}', isError: true);
       }
     } catch (e) {
       _showMessage('Error opening file: $e', isError: true);
     }
   }
 
-  String _formatFileSize(int bytes) {
-    const suffixes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    var i = 0;
-    double size = bytes.toDouble();
+  Future<void> _shareFile(File file) async {
+    try {
+      if (!await file.exists()) {
+        _showMessage('File not found: ${path.basename(file.path)}', isError: true);
+        return;
+      }
 
-    while (size >= 1024 && i < suffixes.length - 1) {
-      size /= 1024;
-      i++;
+      await Share.shareXFiles(
+        [XFile(file.path)],
+        subject: 'Sharing ${path.basename(file.path)}',
+      );
+    } catch (e) {
+      _showMessage('Error sharing file: $e', isError: true);
     }
-
-    return '${size.toStringAsFixed(size >= 100 ? 0 : 1)} ${suffixes[i]}';
   }
 
-   @override
+  Future<bool> showDeleteConfirmation(BuildContext context, String fileName) async {
+    if (!context.mounted) return false;
+    return await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        title: Text('Delete $fileName?'),
+        content: const Text('This action cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    ) ?? false;
+  }
+
+  Future<void> _deleteFile(File file, String category) async {
+    try {
+      if (!await file.exists()) {
+        _showMessage('File already deleted: ${path.basename(file.path)}', isError: true);
+        setState(() {
+          _documents[category]?.remove(file);
+        });
+        return;
+      }
+
+      if (!mounted) return;  // Check before any async operation
+
+      final String fileName = path.basename(file.path);
+      final bool confirmDelete = await showDeleteConfirmation(context, fileName);
+
+      if (!confirmDelete) return;
+      
+      if (!mounted) return;
+
+      await file.delete();
+      setState(() {
+        _documents[category]?.remove(file);
+      });
+      
+      if (mounted) {
+        _showMessage('$fileName deleted successfully');
+      }
+    } catch (e) {
+      if (mounted) {
+        _showMessage('Error deleting file: $e', isError: true);
+      }
+    }
+  }
+
+  String _getFileInfo(File file) {
+    final fileSize = _formatFileSize(file.lengthSync());
+    final lastModified = _formatDate(file.lastModifiedSync());
+    return 'Size: $fileSize\nModified: $lastModified';
+  }
+
+  String _formatFileSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
+  String _formatDate(DateTime dateTime) {
+    return '${dateTime.day}/${dateTime.month}/${dateTime.year} ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
+  }
+
+  Widget _buildFileItem(File file, String category) {
+    final fileName = path.basename(file.path);
+    final fileInfo = _getFileInfo(file);
+
+    return Slidable(
+      endActionPane: ActionPane(
+        motion: const ScrollMotion(),
+        children: [
+          SlidableAction(
+            onPressed: (_) => _shareFile(file),
+            backgroundColor: Colors.blue,
+            foregroundColor: Colors.white,
+            icon: Icons.share,
+            label: 'Share',
+          ),
+          SlidableAction(
+            onPressed: (_) => _deleteFile(file, category),
+            backgroundColor: Colors.red,
+            foregroundColor: Colors.white,
+            icon: Icons.delete,
+            label: 'Delete',
+          ),
+        ],
+      ),
+      child: Card(
+        elevation: 2,
+        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: ListTile(
+          leading: Icon(
+            _categories.firstWhere((cat) => cat['name'] == category)['icon'] as IconData,
+            color: _categories.firstWhere((cat) => cat['name'] == category)['color'] as Color,
+            size: 32,
+          ),
+          title: Text(
+            fileName,
+            style: const TextStyle(fontWeight: FontWeight.bold),
+          ),
+          subtitle: Text(fileInfo),
+          onTap: () => _openFile(file.path),
+          trailing: IconButton(
+            icon: const Icon(Icons.more_vert),
+            onPressed: () {
+              showModalBottomSheet(
+                context: context,
+                builder: (context) => Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ListTile(
+                      leading: const Icon(Icons.open_in_new),
+                      title: const Text('Open'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        _openFile(file.path);
+                      },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.share),
+                      title: const Text('Share'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        _shareFile(file);
+                      },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.delete),
+                      title: const Text('Delete'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        _deleteFile(file, category);
+                      },
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.info_outline),
+                      title: const Text('Properties'),
+                      onTap: () {
+                        Navigator.pop(context);
+                        _showFileProperties(file);
+                      },
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showFileProperties(File file) {
+    final fileName = path.basename(file.path);
+    final fileExt = path.extension(file.path).toLowerCase();
+    final fileSize = _formatFileSize(file.lengthSync());
+    final dateCreated = _formatDate(file.statSync().changed);
+    final dateModified = _formatDate(file.lastModifiedSync());
+    final filePath = file.path;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Properties: $fileName'),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildPropertyRow('Type', fileExt.isEmpty ? 'Unknown' : fileExt.substring(1).toUpperCase()),
+              _buildPropertyRow('Size', fileSize),
+              _buildPropertyRow('Created', dateCreated),
+              _buildPropertyRow('Modified', dateModified),
+              _buildPropertyRow('Location', filePath),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPropertyRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 80,
+            child: Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+          Expanded(
+            child: Text(value),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCategoryList(String categoryName, List<File> files) {
+    final filteredFiles = files
+        .where((file) => path.basename(file.path).toLowerCase().contains(_searchQuery.toLowerCase()))
+        .toList();
+
+    filteredFiles.sort((a, b) => b.lastModifiedSync().compareTo(a.lastModifiedSync()));
+
+    return ExpansionTile(
+      initiallyExpanded: categoryName == 'Documents' || categoryName == 'PDFs',
+      leading: Icon(
+        _categories.firstWhere((cat) => cat['name'] == categoryName)['icon'] as IconData,
+        color: _categories.firstWhere((cat) => cat['name'] == categoryName)['color'] as Color,
+      ),
+      title: Text(
+        '$categoryName (${filteredFiles.length})',
+        style: const TextStyle(fontWeight: FontWeight.bold),
+      ),
+      children: filteredFiles.map((file) => _buildFileItem(file, categoryName)).toList(),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Documents'),
+        title: const Text('Document Manager'),
         actions: [
-          PopupMenuButton<String?>(
-            icon: const Icon(Icons.filter_list),
-            tooltip: 'Filter by category',
-            itemBuilder: (context) => [
-              const PopupMenuItem<String?>(
-                value: null,
-                child: Text('All'),
-              ),
-              ..._categories.map((category) {
-                return PopupMenuItem<String?>(
-                  value: category['name'] as String,
-                  child: Row(
-                    children: [
-                      Icon(category['icon'] as IconData),
-                      const SizedBox(width: 8),
-                      Text(category['name'] as String),
-                    ],
-                  ),
-                );
-              }),
-            ],
-            onSelected: (value) => setState(() => _selectedFilterCategory = value),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadLocalFiles,
+            tooltip: 'Refresh',
           ),
         ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(60),
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: TextField(
+              onChanged: (value) => setState(() => _searchQuery = value),
+              decoration: InputDecoration(
+                hintText: 'Search files...',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () => setState(() => _searchQuery = ''),
+                      )
+                    : null,
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _isUploading ? null : _uploadFile,
@@ -456,164 +481,36 @@ class _DocumentManagementScreenState extends State<DocumentManagementScreen> {
             : const Icon(Icons.add),
         label: Text(_isUploading ? 'Uploading...' : 'Upload File'),
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: _buildDocumentsStream(),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Text(
-                  'Error loading documents: ${snapshot.error}',
-                  style: const TextStyle(color: Colors.red),
-                ),
-              ),
-            );
-          }
-
-          if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          final docs = snapshot.data!.docs;
-          if (docs.isEmpty) {
-            return Center(
+      body: _documents.values.every((files) => files.isEmpty)
+          ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(
-                    Icons.folder_open,
-                    size: 64,
-                    color: Colors.grey,
-                  ),
+                  const Icon(Icons.folder_open, size: 64, color: Colors.grey),
                   const SizedBox(height: 16),
-                  Text(
-                    _selectedFilterCategory != null
-                        ? 'No files in $_selectedFilterCategory category'
-                        : 'No files uploaded yet',
-                    style: Theme.of(context).textTheme.titleMedium,
+                  const Text(
+                    'No files found',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 8),
+                  const Text('Tap the upload button to add files'),
+                  const SizedBox(height: 16),
                   ElevatedButton.icon(
                     onPressed: _uploadFile,
                     icon: const Icon(Icons.add),
-                    label: const Text('Upload File'),
+                    label: const Text('Upload Files'),
                   ),
                 ],
               ),
-            );
-          }
-
-          return ListView.builder(
-            itemCount: docs.length,
-            padding: const EdgeInsets.all(8),
-            itemBuilder: (context, index) {
-              final doc = docs[index];
-              final data = doc.data() as Map<String, dynamic>;
-              final category = _categories.firstWhere(
-                (cat) => cat['name'] == data['category'],
-                orElse: () => _categories.last,
-              );
-
-              return Card(
-                elevation: 2,
-                margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 0),
-                child: ExpansionTile(
-                  leading: Icon(
-                    category['icon'] as IconData,
-                    color: Theme.of(context).primaryColor,
-                  ),
-                  title: Text(
-                    data['name'] as String,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  subtitle: Text(
-                    'Size: ${_formatFileSize(data['size'] as int)}\n'
-                    'Uploaded: ${DateFormat.yMMMd().add_jm().format((data['timestamp'] as Timestamp).toDate())}',
-                  ),
-                  children: [
-                    if (data['description']?.isNotEmpty ?? false)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Description:',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                              ),
-                            ),
-                            Text(
-                              data['description'] as String,
-                              style: const TextStyle(fontSize: 12),
-                            ),
-                          ],
-                        ),
-                      ),
-                    OverflowBar(
-                      alignment: MainAxisAlignment.end,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.visibility),
-                          tooltip: 'View',
-                          onPressed: () => _viewDocument(doc),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.download),
-                          tooltip: 'Download',
-                          onPressed: () async {
-                            try {
-                              final url = data['url'] as String;
-                              if (await canLaunchUrl(Uri.parse(url))) {
-                                await launchUrl(
-                                  Uri.parse(url),
-                                  mode: LaunchMode.externalApplication,
-                                );
-                              } else {
-                                throw 'Could not launch $url';
-                              }
-                            } catch (e) {
-                              _showMessage(
-                                'Error downloading file: $e',
-                                isError: true,
-                              );
-                            }
-                          },
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete),
-                          tooltip: 'Delete',
-                          color: Colors.red,
-                          onPressed: () => _deleteDocument(
-                            doc.id,
-                            data['url'] as String,
-                            data['storagePath'] as String,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              );
-            },
-          );
-        },
-      ),
+            )
+          : RefreshIndicator(
+              onRefresh: _loadLocalFiles,
+              child: ListView(
+                children: _documents.entries
+                    .map((entry) => _buildCategoryList(entry.key, entry.value))
+                    .toList(),
+              ),
+            ),
     );
-  }
-
-  // New method to build the Firestore query stream
-  Stream<QuerySnapshot> _buildDocumentsStream() {
-    Query query = FirebaseFirestore.instance.collection('documents');
-
-    // Apply category filter if a category is selected
-    if (_selectedFilterCategory != null) {
-      query = query.where('category', isEqualTo: _selectedFilterCategory);
-    }
-
-    // Order by timestamp in descending order
-    return query.orderBy('timestamp', descending: true).snapshots();
   }
 }

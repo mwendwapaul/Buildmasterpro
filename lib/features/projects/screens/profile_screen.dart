@@ -4,14 +4,13 @@ import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ProfileScreen extends StatefulWidget {
-  final String email;
+  final String email; // The authenticated email passed from the parent
   final VoidCallback onLogout;
 
   const ProfileScreen({
     super.key,
     required this.email,
-    required this.onLogout,
-    required String username,
+    required this.onLogout, required String username,
   });
 
   @override
@@ -46,7 +45,7 @@ class ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         _usernameController.text = username ?? 'User';
         _image = imagePath != null ? XFile(imagePath) : null;
-            });
+      });
     }
   }
 
@@ -97,11 +96,11 @@ class ProfileScreenState extends State<ProfileScreen> {
         content: const Text('You have unsaved changes. Do you want to discard them?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
+            onPressed: () => Navigator.pop(context, false),
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
+            onPressed: () => Navigator.pop(context, true),
             child: const Text('Discard'),
           ),
         ],
@@ -154,19 +153,16 @@ class ProfileScreenState extends State<ProfileScreen> {
   Widget build(BuildContext context) {
     return PopScope(
       canPop: !_hasUnsavedChanges,
-      // ignore: deprecated_member_use
-      onPopInvoked: (bool didPop) async {
-        if (didPop) return;
-        
-        final bool shouldPop = await _handlePopScope();
-        if (shouldPop && context.mounted) {
-          Navigator.of(context).pop();
-        }
-      },
-      child: Scaffold(
+      onPopInvokedWithResult: (didPop, result) async {
+      if (didPop) return;  // If already popped, do nothing
+      final bool shouldPop = await _handlePopScope();
+      if (shouldPop && context.mounted) {
+        Navigator.of(context).pop();  // Pop without result, or pass a result if needed
+      }
+    },
+          child: Scaffold(
         appBar: AppBar(
-          title: const Text('Profile',
-              style: TextStyle(fontWeight: FontWeight.bold)),
+          title: const Text('Profile', style: TextStyle(fontWeight: FontWeight.bold)),
           centerTitle: true,
           backgroundColor: const Color.fromARGB(255, 247, 246, 244),
           elevation: 0,
@@ -229,7 +225,7 @@ class ProfileScreenState extends State<ProfileScreen> {
                                 borderRadius: BorderRadius.circular(20),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.2),
+                                    color: Colors.black.withValues(alpha:0.2),
                                     blurRadius: 5,
                                     spreadRadius: 1,
                                   ),
@@ -266,7 +262,7 @@ class ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 16),
                     _buildProfileField(
                       'Email',
-                      TextEditingController(text: widget.email),
+                      TextEditingController(text: widget.email), // Use the passed email
                       Icons.email,
                       isEditable: false,
                     ),
@@ -341,7 +337,7 @@ class ProfileScreenState extends State<ProfileScreen> {
             borderRadius: BorderRadius.circular(15),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.1),
+                color: Colors.black.withValues(alpha:0.1),
                 blurRadius: 5,
                 spreadRadius: 1,
                 offset: const Offset(0, 2),

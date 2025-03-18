@@ -43,16 +43,16 @@ class Task {
   }) : id = id ?? DateTime.now().millisecondsSinceEpoch.toString();
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'title': title,
-      'startDate': startDate.toIso8601String(),
-      'endDate': endDate.toIso8601String(),
-      'status': status.index,
-      'progress': progress,
-      'color': color?.value,
-    };
-  }
+  return {
+    'id': id,
+    'title': title,
+    'startDate': startDate.toIso8601String(),
+    'endDate': endDate.toIso8601String(),
+    'status': status.index,
+    'progress': progress,
+    'color': color?.toInt(), 
+  };
+}
 
   factory Task.fromJson(Map<String, dynamic> json) {
     return Task(
@@ -65,6 +65,10 @@ class Task {
       color: json['color'] != null ? Color(json['color']) : null,
     );
   }
+}
+
+extension on Color? {
+  toInt() {}
 }
 
 enum TaskStatus { notStarted, inProgress, completed }
@@ -298,7 +302,7 @@ class GanttChartScreenState extends State<GanttChartScreen> with TickerProviderS
                   data: SliderThemeData(
                     activeTrackColor: selectedColor,
                     thumbColor: selectedColor,
-                    overlayColor: selectedColor.withOpacity(0.2),
+                    overlayColor: selectedColor.withValues(alpha:0.2),
                   ),
                   child: Slider(
                     value: progress,
@@ -327,7 +331,7 @@ class GanttChartScreenState extends State<GanttChartScreen> with TickerProviderS
                             ? Border.all(color: Colors.white, width: 2)
                             : null,
                           boxShadow: selectedColor == color
-                            ? [BoxShadow(color: color.withOpacity(0.4), blurRadius: 4)]
+                            ? [BoxShadow(color: color.withValues(alpha:0.4), blurRadius: 4)]
                             : null,
                         ),
                       ),
@@ -625,11 +629,11 @@ class GanttChartScreenState extends State<GanttChartScreen> with TickerProviderS
           width: width,
           decoration: BoxDecoration(
             color: (task.color ?? _getStatusColor(task.status, task))
-                .withOpacity(0.8),
+                .withValues(alpha:0.8),
             borderRadius: BorderRadius.circular(8),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.1),
+                color: Colors.black.withValues(alpha:0.1),
                 blurRadius: 4,
                 offset: const Offset(0, 2),
               ),

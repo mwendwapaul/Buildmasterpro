@@ -127,7 +127,7 @@ class ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                           'Get back to managing your\nconstruction projects',
                           textAlign: TextAlign.center,
                           style: theme.textTheme.titleMedium?.copyWith(
-                            color: theme.colorScheme.onPrimary.withOpacity(0.8),
+                            color: theme.colorScheme.onPrimary.withValues(alpha:0.8),
                           ),
                         ),
                       ],
@@ -189,7 +189,7 @@ class ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           Text(
             'Enter your email address and we\'ll send you instructions to reset your password.',
             style: theme.textTheme.bodyLarge?.copyWith(
-              color: theme.colorScheme.onSurface.withOpacity(0.7),
+              color: theme.colorScheme.onSurface.withValues(alpha:0.7),
             ),
             textAlign: TextAlign.center,
           ),
@@ -257,7 +257,7 @@ class ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               Text(
                 'Remember your password? ',
                 style: TextStyle(
-                  color: theme.colorScheme.onSurface.withOpacity(0.7),
+                  color: theme.colorScheme.onSurface.withValues(alpha:0.7),
                 ),
               ),
               TextButton(
@@ -294,7 +294,7 @@ class ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         Text(
           'We\'ve sent password reset instructions to:\n${_emailController.text}',
           style: theme.textTheme.bodyLarge?.copyWith(
-            color: theme.colorScheme.onSurface.withOpacity(0.7),
+            color: theme.colorScheme.onSurface.withValues(alpha:0.7),
           ),
           textAlign: TextAlign.center,
         ),

@@ -242,7 +242,7 @@ class RegisterScreenState extends State<RegisterScreen> {
               'Join us to manage your construction projects',
               textAlign: TextAlign.center,
               style: theme.textTheme.titleMedium?.copyWith(
-                color: theme.colorScheme.onPrimary.withOpacity(0.8),
+                color: theme.colorScheme.onPrimary.withValues(alpha:0.8),
               ),
             ),
           ],

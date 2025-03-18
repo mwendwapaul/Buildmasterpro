@@ -14,14 +14,6 @@
       },
       "oauth_client": [
         {
-          "client_id": "168277520180-a9banaof4op299955rhdon0rpp7occia.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.build.masterpro",
-            "certificate_hash": "44ea7c52e84af0d21ec23c602205f064c817bca6"
-          }
-        },
-        {
           "client_id": "168277520180-nesdnrhck026fkfdktjikr4p3qt8nklo.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {

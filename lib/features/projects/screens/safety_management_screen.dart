@@ -23,7 +23,7 @@ class SafetyManagementScreen extends ConsumerWidget {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Theme.of(context).colorScheme.primary.withOpacity(0.1),
+              Theme.of(context).colorScheme.primary.withValues(alpha:0.1),
               Colors.white,
             ],
           ),
@@ -134,8 +134,8 @@ class SafetyManagementScreen extends ConsumerWidget {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                color.withOpacity(0.1),
-                color.withOpacity(0.2),
+                color.withValues(alpha:0.1),
+                color.withValues(alpha:0.2),
               ],
             ),
             borderRadius: BorderRadius.circular(15),
@@ -155,7 +155,7 @@ class SafetyManagementScreen extends ConsumerWidget {
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: color.withOpacity(0.8),
+                  color: color.withValues(alpha:0.8),
                 ),
               ),
             ],

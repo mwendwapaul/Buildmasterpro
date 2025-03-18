@@ -1,13 +1,38 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
+import 'package:shared_preferences/shared_preferences.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  File? _profileImage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfileImage();
+  }
+
+  Future<void> _loadProfileImage() async {
+    final prefs = await SharedPreferences.getInstance();
+    final imagePath = prefs.getString('profile_image');
+    if (imagePath != null && mounted) {
+      setState(() {
+        _profileImage = File(imagePath);
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: Colors.grey[50],
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
@@ -15,27 +40,35 @@ class HomeScreen extends StatelessWidget {
               floating: true,
               pinned: true,
               expandedHeight: 120,
-              backgroundColor: Colors.white,
+              backgroundColor: Theme.of(context).appBarTheme.backgroundColor,
               elevation: 0,
+              leading: IconButton(
+                icon: Icon(
+                  Icons.settings,
+                  color: Theme.of(context).appBarTheme.foregroundColor,
+                ),
+                onPressed: () => Navigator.pushNamed(context, '/settings'),
+                tooltip: 'Settings',
+              ),
               flexibleSpace: FlexibleSpaceBar(
-                title: const Text(
+                title: Text(
                   'BuildMaster Pro',
                   style: TextStyle(
-                    color: Colors.black87,
+                    color: Theme.of(context).appBarTheme.foregroundColor,
                     fontWeight: FontWeight.w800,
                     fontSize: 22,
                   ),
                 ),
                 centerTitle: true,
                 background: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 20,
-                        offset: const Offset(0, 4),
+                  color: Theme.of(context).appBarTheme.backgroundColor,
+                  child: Column(
+                    children: [
+                      Container(
+                        height: 4,
+                        color: isDarkMode ? Colors.grey[700] : Colors.grey[300],
                       ),
+                      const Spacer(),
                     ],
                   ),
                 ),
@@ -45,36 +78,21 @@ class HomeScreen extends StatelessWidget {
                   padding: const EdgeInsets.only(right: 16.0),
                   child: GestureDetector(
                     onTap: () => Navigator.pushNamed(context, '/profile'),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.grey[200]!, width: 2),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 10,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Hero(
-                        tag: 'profile-photo',
-                        child: CircleAvatar(
-                          radius: 20,
-                          backgroundColor: Colors.grey[100],
-                          child: ClipOval(
-                            child: Image.file(
-                              File('path_to_saved_photo.jpg'),
-                              width: 40,
-                              height: 40,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return const Icon(Icons.person,
-                                    color: Colors.grey);
-                              },
-                            ),
-                          ),
-                        ),
+                    child: Hero(
+                      tag: 'profile_image',
+                      child: CircleAvatar(
+                        radius: 20,
+                        backgroundColor: isDarkMode ? Colors.grey[700] : Colors.grey[200],
+                        backgroundImage: _profileImage != null
+                            ? FileImage(_profileImage!)
+                            : null,
+                        child: _profileImage == null
+                            ? Icon(
+                                Icons.person,
+                                color: isDarkMode ? Colors.grey[400] : Colors.grey,
+                                size: 24,
+                              )
+                            : null,
                       ),
                     ),
                   ),
@@ -83,8 +101,7 @@ class HomeScreen extends StatelessWidget {
             ),
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 20.0, vertical: 16.0),
+                padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -93,7 +110,7 @@ class HomeScreen extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.w600,
-                        color: Colors.grey[800],
+                        color: isDarkMode ? Colors.white : Colors.grey[800],
                         letterSpacing: -0.5,
                       ),
                     ),
@@ -102,7 +119,7 @@ class HomeScreen extends StatelessWidget {
                       'What would you like to do today?',
                       style: TextStyle(
                         fontSize: 16,
-                        color: Colors.grey[600],
+                        color: isDarkMode ? Colors.grey[400] : Colors.grey[600],
                         height: 1.5,
                         letterSpacing: 0.2,
                       ),
@@ -191,8 +208,9 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSection(
-      BuildContext context, String title, List<_MenuItem> items) {
+  Widget _buildSection(BuildContext context, String title, List<_MenuItem> items) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -200,29 +218,22 @@ class HomeScreen extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 16.0),
           child: Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w600,
-              color: Colors.black87,
+              color: isDarkMode ? Colors.white : Colors.black87,
               letterSpacing: -0.5,
             ),
           ),
         ),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            // Adjusted the childAspectRatio to provide more height
-            return GridView.count(
-              crossAxisCount: 3,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              mainAxisSpacing: 12.0,
-              crossAxisSpacing: 12.0,
-              childAspectRatio: (constraints.maxWidth / 3 - 8) /
-                  120, // Increased from 110 to 120
-              children:
-                  items.map((item) => _buildHomeButton(context, item)).toList(),
-            );
-          },
+        GridView.count(
+          crossAxisCount: 3,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          mainAxisSpacing: 12.0,
+          crossAxisSpacing: 12.0,
+          childAspectRatio: 0.8,
+          children: items.map((item) => _buildHomeButton(context, item)).toList(),
         ),
         const SizedBox(height: 8),
       ],
@@ -230,9 +241,12 @@ class HomeScreen extends StatelessWidget {
   }
 
   Widget _buildHomeButton(BuildContext context, _MenuItem item) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Material(
-      color: Colors.white,
+      color: isDarkMode ? Colors.grey[800] : Colors.white,
       borderRadius: BorderRadius.circular(16),
+      elevation: isDarkMode ? 2 : 0, // Slight elevation in dark mode for visibility
       child: InkWell(
         onTap: () => Navigator.pushNamed(context, item.route),
         borderRadius: BorderRadius.circular(16),
@@ -240,10 +254,13 @@ class HomeScreen extends StatelessWidget {
           padding: const EdgeInsets.all(12.0),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey[100]!, width: 1),
+            border: Border.all(
+              color: isDarkMode ? Colors.grey[700]! : Colors.grey[100]!,
+              width: 1,
+            ),
             boxShadow: [
               BoxShadow(
-                color: item.color.withOpacity(0.1),
+                color: item.color.withValues(alpha: 0.1),
                 blurRadius: 20,
                 offset: const Offset(0, 8),
               ),
@@ -255,7 +272,7 @@ class HomeScreen extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: item.color.withOpacity(0.1),
+                  color: item.color.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
@@ -270,7 +287,7 @@ class HomeScreen extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
-                  color: Colors.grey[800],
+                  color: isDarkMode ? Colors.white : Colors.grey[800],
                   height: 1.2,
                 ),
                 textAlign: TextAlign.center,

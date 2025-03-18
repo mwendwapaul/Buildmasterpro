@@ -1,7 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:flutter/material.dart';
 import 'package:logging/logging.dart'; // Import logging package
 import '../models/metric.dart';
 
@@ -74,28 +73,28 @@ class AnalyticsService {
         title: 'Revenue',
         value: 250000.0,
         change: '+12.5%',
-        color: Colors.blue.value,
+        color: 0xFF2196F3,
         data: [150000.0, 180000.0, 220000.0, 250000.0, 230000.0, 260000.0], lastUpdated: null, trend: null,
       ),
       Metric(
         title: 'Expenses',
         value: 150000.0,
         change: '+8.3%',
-        color: Colors.red.value,
+        color: 0xFFF44336,
         data: [90000.0, 110000.0, 130000.0, 150000.0, 140000.0, 155000.0], lastUpdated: null, trend: null,
       ),
       Metric(
         title: 'Profit',
         value: 100000.0,
         change: '+15.2%',
-        color: Colors.green.value,
+        color: 0xFF4CAF50,
         data: [60000.0, 70000.0, 90000.0, 100000.0, 90000.0, 105000.0], lastUpdated: null, trend: null,
       ),
       Metric(
         title: 'Active Users',
         value: 1200.0,
         change: '+5.8%',
-        color: Colors.orange.value,
+        color: 0xFFFF9800,
         data: [800.0, 900.0, 1000.0, 1200.0, 1150.0, 1250.0], lastUpdated: null, trend: null,
       ),
     ];

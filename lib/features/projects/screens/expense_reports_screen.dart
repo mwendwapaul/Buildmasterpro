@@ -500,7 +500,7 @@ class _ExpenseReportsScreenState extends State<ExpenseReportsScreen> {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: Colors.orange.withOpacity(0.2),
+          backgroundColor: Colors.orange.withValues(alpha:0.2),
           child: Icon(
             _getCategoryIcon(expense.category),
             color: Colors.orange,
